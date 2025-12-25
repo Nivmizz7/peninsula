@@ -2,75 +2,57 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const publicRoot = path.join(__dirname, "public");
-const mapsRoot = path.join(__dirname, "maps");
+const port = process.env.PORT || 3000;
+const publicDir = path.join(__dirname, "public");
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".png": "image/png",
+  ".js": "application/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
-  ".json": "application/json; charset=utf-8"
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
 };
 
-function safePath(root, urlPath) {
-  const decoded = decodeURIComponent(urlPath.split("?")[0]);
-  const cleaned = decoded.replace(/^\/+/, "");
-  const resolved = path.normalize(path.join(root, cleaned));
-  if (!resolved.startsWith(root)) {
+function safeJoin(base, target) {
+  const targetPath = path.normalize(path.join(base, target));
+  if (!targetPath.startsWith(base)) {
     return null;
   }
-  return resolved;
-}
-
-function serveFile(filePath, res) {
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("Not found");
-      return;
-    }
-    const ext = path.extname(filePath);
-    const type = contentTypes[ext] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": type });
-    res.end(data);
-  });
+  return targetPath;
 }
 
 const server = http.createServer((req, res) => {
-  if (!req.url) {
-    res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+  const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  const requested = urlPath === "/" ? "/index.html" : urlPath;
+  const filePath = safeJoin(publicDir, requested);
+
+  if (!filePath) {
+    res.writeHead(400);
     res.end("Bad request");
     return;
   }
 
-  if (req.url === "/" || req.url.startsWith("/index.html")) {
-    serveFile(path.join(publicRoot, "index.html"), res);
-    return;
-  }
-
-  if (req.url.startsWith("/maps/")) {
-    const filePath = safePath(mapsRoot, req.url);
-    if (!filePath) {
-      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("Forbidden");
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      if (err.code === "ENOENT") {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
+      res.writeHead(500);
+      res.end("Server error");
       return;
     }
-    serveFile(filePath, res);
-    return;
-  }
 
-  const filePath = safePath(publicRoot, req.url);
-  if (!filePath) {
-    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Forbidden");
-    return;
-  }
-  serveFile(filePath, res);
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { "Content-Type": contentTypes[ext] || "application/octet-stream" });
+    res.end(data);
+  });
 });
 
-const port = process.env.PORT || 3000;
 server.listen(port, () => {
-  console.log(`EFT quest panel running on http://localhost:${port}`);
+  console.log(`Peninsula running on http://localhost:${port}`);
 });

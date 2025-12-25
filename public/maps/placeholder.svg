@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a2422" />
+      <stop offset="100%" stop-color="#0c1110" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)" />
+  <rect x="120" y="140" width="960" height="520" fill="none" stroke="#f65f3b" stroke-width="6" stroke-dasharray="14 12" />
+  <text x="600" y="360" fill="#f2f4f3" font-family="Space Grotesk, sans-serif" font-size="36" text-anchor="middle">Ajoute une image de map</text>
+  <text x="600" y="410" fill="#cdd3d1" font-family="Space Grotesk, sans-serif" font-size="20" text-anchor="middle">/public/maps/&lt;normalizedName&gt;.png</text>
+</svg>

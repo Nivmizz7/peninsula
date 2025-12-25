@@ -1,71 +1,64 @@
 <!doctype html>
 <html lang="fr">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EFT Admin Panel</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Peninsula - Raid Planner</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="app">
-      <aside class="sidebar">
+      <aside class="rail">
         <div class="brand">
-          <div class="brand-mark">EFT</div>
-          <div class="brand-title">Quest Admin</div>
+          <span class="brand-title">Peninsula</span>
+          <span class="brand-subtitle">Raid planner Tarkov</span>
         </div>
 
-        <section class="card">
-          <h2>Nouvelle quete</h2>
-          <form id="quest-form">
-            <label>
-              Nom
-              <input type="text" id="quest-name" placeholder="Ex: Signal Part 1" required />
-            </label>
-            <label>
-              Map
-              <select id="quest-map"></select>
-            </label>
-            <button type="submit">Ajouter la quete</button>
-          </form>
-        </section>
+        <div class="panel">
+          <label class="panel-label" for="mapSelect">Map</label>
+          <select id="mapSelect" class="panel-select"></select>
+        </div>
 
-        <section class="card">
-          <div class="card-header">
-            <h2>Quetes</h2>
-            <div class="pill" id="map-pill"></div>
-          </div>
-          <div id="quest-list" class="quest-list"></div>
-        </section>
+        <div class="panel">
+          <label class="panel-label" for="taskSelect">Quetes</label>
+          <select id="taskSelect" class="panel-select">
+            <option value="">Ajouter une quete...</option>
+          </select>
+        </div>
 
-        <section class="card selected">
-          <h2>Selection</h2>
-          <div id="selected-quest" class="selected-quest"></div>
-        </section>
+        <div class="panel panel-grow">
+          <div class="panel-label">Quetes selectionnees</div>
+          <div id="selectedTasks" class="selected-tasks"></div>
+        </div>
+
+        <div class="panel status">
+          <div class="panel-label">Statut</div>
+          <div id="statusText" class="status-text">Chargement...</div>
+        </div>
       </aside>
 
-      <main class="main">
-        <header class="topbar">
-          <div class="topbar-left">
-            <h1>Cartes 2D</h1>
-            <p>Ajoute des points sur les maps Tarkov pour organiser les quetes.</p>
+      <main class="map-area">
+        <header class="map-header">
+          <div>
+            <h1 id="mapTitle" class="map-title">Map</h1>
+            <p id="mapSubtitle" class="map-subtitle">Choisissez une map</p>
           </div>
-          <div class="topbar-right">
-            <label class="inline">
-              Map active
-              <select id="current-map"></select>
-            </label>
-          </div>
+          <div id="floorControls" class="floor-controls"></div>
         </header>
 
-        <section class="map-panel">
-          <div class="map-overlay">
-            <div id="map-message" class="map-message"></div>
-          </div>
-          <canvas id="map-canvas" width="1200" height="750"></canvas>
-        </section>
+        <div class="map-frame">
+          <img id="mapImage" class="map-image" alt="Map" />
+          <div id="markerLayer" class="marker-layer"></div>
+          <div id="mapEmpty" class="map-empty">Aucun objectif sur cette map.</div>
+        </div>
+
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot legend-dot-red"></span>Etage selectionne</span>
+          <span class="legend-item"><span class="legend-dot legend-dot-black"></span>Autre etage</span>
+        </div>
       </main>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>

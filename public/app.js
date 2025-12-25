@@ -1,275 +1,443 @@
-const MAPS = [
-  "The Labs",
-  "Ground Zero",
-  "Woods",
-  "Customs",
-  "Factory",
-  "Interchange",
-  "Lighthouse",
-  "Shoreline",
-  "Terminal"
-];
+const API_URL = "https://api.tarkov.dev/graphql";
+const LANG = "fr";
 
-const STORAGE_KEY = "eft-quest-panel";
+const TASKS_QUERY = `
+  query Tasks($lang: LanguageCode!) {
+    tasks(lang: $lang) {
+      id
+      name
+      map {
+        id
+        name
+        normalizedName
+      }
+      objectives {
+        __typename
+        ... on TaskObjectiveBasic {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zones {
+            id
+            map {
+              name
+              normalizedName
+            }
+            position {
+              x
+              y
+              z
+            }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveMark {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zones {
+            id
+            map {
+              name
+              normalizedName
+            }
+            position {
+              x
+              y
+              z
+            }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveItem {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zones {
+            id
+            map {
+              name
+              normalizedName
+            }
+            position {
+              x
+              y
+              z
+            }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveQuestItem {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zones {
+            id
+            map {
+              name
+              normalizedName
+            }
+            position {
+              x
+              y
+              z
+            }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveUseItem {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zones {
+            id
+            map {
+              name
+              normalizedName
+            }
+            position {
+              x
+              y
+              z
+            }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveExtract {
+          id
+          type
+          description
+          maps {
+            name
+            normalizedName
+          }
+          zoneNames
+        }
+      }
+    }
+  }
+`;
 
-const elements = {
-  questForm: document.querySelector("#quest-form"),
-  questName: document.querySelector("#quest-name"),
-  questMap: document.querySelector("#quest-map"),
-  questList: document.querySelector("#quest-list"),
-  selectedQuest: document.querySelector("#selected-quest"),
-  currentMap: document.querySelector("#current-map"),
-  mapPill: document.querySelector("#map-pill"),
-  mapMessage: document.querySelector("#map-message"),
-  canvas: document.querySelector("#map-canvas")
-};
-
-const ctx = elements.canvas.getContext("2d");
-const mapImage = new Image();
-mapImage.src = "/maps/maps.png";
+const MAPS_QUERY = `
+  query Maps($lang: LanguageCode!) {
+    maps(lang: $lang) {
+      id
+      name
+      normalizedName
+    }
+  }
+`;
 
 const state = {
-  quests: [],
-  selectedQuestId: null,
-  currentMap: MAPS[0]
+  maps: [],
+  tasks: [],
+  selectedMapId: null,
+  selectedMapNormalized: null,
+  selectedTaskIds: new Set(),
+  floors: [],
+  selectedFloorIndex: 0,
 };
 
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
-  try {
-    const parsed = JSON.parse(raw);
-    state.quests = Array.isArray(parsed.quests) ? parsed.quests : [];
-    state.selectedQuestId = parsed.selectedQuestId || null;
-    state.currentMap = parsed.currentMap || MAPS[0];
-  } catch (err) {
-    console.warn("Failed to parse stored state", err);
+const mapSelect = document.getElementById("mapSelect");
+const taskSelect = document.getElementById("taskSelect");
+const selectedTasksEl = document.getElementById("selectedTasks");
+const statusText = document.getElementById("statusText");
+const mapTitle = document.getElementById("mapTitle");
+const mapSubtitle = document.getElementById("mapSubtitle");
+const mapImage = document.getElementById("mapImage");
+const markerLayer = document.getElementById("markerLayer");
+const mapEmpty = document.getElementById("mapEmpty");
+const floorControls = document.getElementById("floorControls");
+
+function setStatus(message) {
+  statusText.textContent = message;
+}
+
+async function fetchGraphQL(query, variables) {
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erreur API: ${response.status}`);
   }
+
+  const payload = await response.json();
+  if (payload.errors) {
+    throw new Error(payload.errors.map((err) => err.message).join(" | "));
+  }
+
+  return payload.data;
 }
 
-function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      quests: state.quests,
-      selectedQuestId: state.selectedQuestId,
-      currentMap: state.currentMap
-    })
-  );
+function mapImagePath(normalizedName) {
+  return `maps/${normalizedName}.png`;
 }
 
-function createOption(value) {
+function createOption(value, label) {
   const option = document.createElement("option");
   option.value = value;
-  option.textContent = value;
+  option.textContent = label;
   return option;
 }
 
-function populateSelects() {
-  MAPS.forEach((map) => {
-    elements.questMap.appendChild(createOption(map));
-    elements.currentMap.appendChild(createOption(map));
+function renderMapOptions() {
+  mapSelect.innerHTML = "";
+  state.maps.forEach((map) => {
+    mapSelect.appendChild(createOption(map.id, map.name));
   });
 }
 
-function formatPoint(point) {
-  return `x:${Math.round(point.x)} y:${Math.round(point.y)}`;
-}
-
-function getQuestById(id) {
-  return state.quests.find((quest) => quest.id === id);
-}
-
-function colorForQuest(id) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue} 55% 50%)`;
-}
-
-function drawGrid() {
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  ctx.lineWidth = 1;
-  const step = 80;
-  for (let x = 0; x < elements.canvas.width; x += step) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, elements.canvas.height);
-    ctx.stroke();
-  }
-  for (let y = 0; y < elements.canvas.height; y += step) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(elements.canvas.width, y);
-    ctx.stroke();
-  }
-}
-
-function drawMap() {
-  ctx.clearRect(0, 0, elements.canvas.width, elements.canvas.height);
-  ctx.fillStyle = "#0f1a17";
-  ctx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
-
-  if (mapImage.complete && mapImage.naturalWidth) {
-    ctx.drawImage(mapImage, 0, 0, elements.canvas.width, elements.canvas.height);
-  }
-
-  drawGrid();
-
-  const questsForMap = state.quests.filter((quest) => quest.map === state.currentMap);
-  questsForMap.forEach((quest) => {
-    quest.points.forEach((point) => {
-      ctx.beginPath();
-      ctx.fillStyle = colorForQuest(quest.id);
-      ctx.arc(point.x, point.y, quest.id === state.selectedQuestId ? 8 : 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#0f1a17";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+function renderTaskOptions() {
+  taskSelect.innerHTML = "";
+  taskSelect.appendChild(createOption("", "Ajouter une quete..."));
+  state.tasks
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((task) => {
+      const label = task.map ? `${task.name} (${task.map.name})` : task.name;
+      taskSelect.appendChild(createOption(task.id, label));
     });
-  });
-
-  ctx.fillStyle = "rgba(15, 26, 23, 0.7)";
-  ctx.fillRect(16, elements.canvas.height - 48, 220, 32);
-  ctx.fillStyle = "#fefcf6";
-  ctx.font = "600 16px 'Space Grotesk', sans-serif";
-  ctx.fillText(state.currentMap, 28, elements.canvas.height - 26);
 }
 
-function renderQuestList() {
-  elements.questList.innerHTML = "";
-  state.quests.forEach((quest) => {
-    const item = document.createElement("div");
-    item.className = "quest-item";
-    if (quest.id === state.selectedQuestId) {
-      item.classList.add("active");
-    }
-    if (quest.map !== state.currentMap) {
-      item.classList.add("disabled");
-    }
+function renderSelectedTasks() {
+  selectedTasksEl.innerHTML = "";
+  const selected = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
 
-    const title = document.createElement("div");
-    title.textContent = quest.name;
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = `${quest.map} · ${quest.points.length} points`;
+  if (!selected.length) {
+    selectedTasksEl.innerHTML = "<div class=\"status-text\">Aucune quete selectionnee.</div>";
+    return;
+  }
 
-    item.appendChild(title);
-    item.appendChild(meta);
-    item.addEventListener("click", () => {
-      if (quest.map !== state.currentMap) {
+  selected.forEach((task) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "task-chip";
+    button.textContent = task.name;
+    button.title = "Cliquer pour retirer";
+    button.addEventListener("click", () => {
+      state.selectedTaskIds.delete(task.id);
+      renderSelectedTasks();
+      updateMapView();
+    });
+    selectedTasksEl.appendChild(button);
+  });
+}
+
+function setMapSelection(mapId) {
+  const map = state.maps.find((item) => item.id === mapId) || state.maps[0];
+  if (!map) {
+    return;
+  }
+
+  state.selectedMapId = map.id;
+  state.selectedMapNormalized = map.normalizedName;
+  mapSelect.value = map.id;
+  mapTitle.textContent = map.name;
+  mapSubtitle.textContent = `Image attendue: maps/${map.normalizedName}.png`;
+
+  mapImage.src = mapImagePath(map.normalizedName);
+  mapImage.onerror = () => {
+    mapImage.src = "maps/placeholder.svg";
+  };
+
+  updateMapView();
+}
+
+function getObjectiveZonesForMap(mapNormalized) {
+  const selectedTasks = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
+  const zones = [];
+
+  selectedTasks.forEach((task) => {
+    task.objectives.forEach((objective) => {
+      if (!objective.zones) {
         return;
       }
-      state.selectedQuestId = quest.id;
-      saveState();
-      render();
+
+      objective.zones.forEach((zone) => {
+        const zoneMap = zone.map?.normalizedName;
+        if (zoneMap && zoneMap === mapNormalized && zone.position) {
+          zones.push({
+            taskName: task.name,
+            objective: objective.description,
+            position: zone.position,
+            top: zone.top,
+            bottom: zone.bottom,
+          });
+        }
+      });
     });
-    elements.questList.appendChild(item);
+  });
+
+  return zones;
+}
+
+function getZoneZ(zone) {
+  const directZ = zone.position?.z;
+  if (Number.isFinite(directZ)) {
+    return directZ;
+  }
+
+  if (Number.isFinite(zone.top) && Number.isFinite(zone.bottom)) {
+    return (zone.top + zone.bottom) / 2;
+  }
+
+  return 0;
+}
+
+function computeFloors(zones) {
+  if (!zones.length) {
+    return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
+  }
+
+  const zValues = zones.map((zone) => getZoneZ(zone));
+  const minZ = Math.min(...zValues);
+  const maxZ = Math.max(...zValues);
+
+  if (Math.abs(maxZ - minZ) < 0.01) {
+    return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
+  }
+
+  const step = (maxZ - minZ) / 3;
+  return [
+    { label: "Bas", min: minZ - 0.01, max: minZ + step },
+    { label: "Milieu", min: minZ + step, max: minZ + step * 2 },
+    { label: "Haut", min: minZ + step * 2, max: maxZ + 0.01 },
+  ];
+}
+
+function zoneFloorIndex(zone, floors) {
+  const z = getZoneZ(zone);
+  const index = floors.findIndex((floor) => z >= floor.min && z <= floor.max);
+  return index === -1 ? 0 : index;
+}
+
+function renderFloorControls() {
+  floorControls.innerHTML = "";
+  state.floors.forEach((floor, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `floor-btn ${index === state.selectedFloorIndex ? "active" : ""}`;
+    button.textContent = floor.label;
+    button.addEventListener("click", () => {
+      state.selectedFloorIndex = index;
+      renderFloorControls();
+      updateMarkers();
+    });
+    floorControls.appendChild(button);
   });
 }
 
-function renderSelectedQuest() {
-  elements.selectedQuest.innerHTML = "";
-  const quest = getQuestById(state.selectedQuestId);
-  if (!quest) {
-    elements.selectedQuest.textContent = "Aucune quete selectionnee.";
+function updateMarkers() {
+  markerLayer.innerHTML = "";
+
+  const zones = getObjectiveZonesForMap(state.selectedMapNormalized);
+  if (!zones.length) {
+    mapEmpty.style.display = "flex";
     return;
   }
 
-  const header = document.createElement("div");
-  header.innerHTML = `<strong>${quest.name}</strong><div class="meta">${quest.map}</div>`;
-  elements.selectedQuest.appendChild(header);
+  mapEmpty.style.display = "none";
+  const xValues = zones.map((zone) => zone.position.x);
+  const yValues = zones.map((zone) => zone.position.y);
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const minY = Math.min(...yValues);
+  const maxY = Math.max(...yValues);
 
-  if (!quest.points.length) {
-    const empty = document.createElement("div");
-    empty.textContent = "Clique sur la map pour ajouter un point.";
-    elements.selectedQuest.appendChild(empty);
-    return;
-  }
+  const xRange = maxX - minX || 1;
+  const yRange = maxY - minY || 1;
 
-  quest.points.forEach((point, index) => {
-    const row = document.createElement("div");
-    row.className = "point";
+  zones.forEach((zone) => {
+    const xPercent = ((zone.position.x - minX) / xRange) * 100;
+    const yPercent = ((zone.position.y - minY) / yRange) * 100;
+    const floorIndex = zoneFloorIndex(zone, state.floors);
+    const onSelectedFloor = floorIndex === state.selectedFloorIndex;
+
+    const marker = document.createElement("div");
+    marker.className = `marker ${onSelectedFloor ? "red" : "black"}`;
+    marker.style.left = `${xPercent}%`;
+    marker.style.top = `${100 - yPercent}%`;
+
     const label = document.createElement("div");
-    label.textContent = formatPoint(point);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.textContent = "Supprimer";
-    remove.addEventListener("click", () => {
-      quest.points.splice(index, 1);
-      saveState();
-      render();
-    });
-    row.appendChild(label);
-    row.appendChild(remove);
-    elements.selectedQuest.appendChild(row);
+    label.className = "marker-label";
+    label.textContent = zone.objective;
+    marker.appendChild(label);
+
+    markerLayer.appendChild(marker);
   });
 }
 
-function updateMapMessage() {
-  const quest = getQuestById(state.selectedQuestId);
-  if (!quest) {
-    elements.mapMessage.textContent = "Selectionne une quete pour placer des points.";
-    return;
-  }
-  if (quest.map !== state.currentMap) {
-    elements.mapMessage.textContent = `Cette quete est liee a ${quest.map}. Change la map active.`;
-    return;
-  }
-  elements.mapMessage.textContent = "Clique sur la map pour ajouter un point.";
+function updateMapView() {
+  const zones = getObjectiveZonesForMap(state.selectedMapNormalized);
+  state.floors = computeFloors(zones);
+  state.selectedFloorIndex = Math.min(state.selectedFloorIndex, state.floors.length - 1);
+  renderFloorControls();
+  updateMarkers();
 }
 
-function render() {
-  elements.currentMap.value = state.currentMap;
-  elements.questMap.value = state.currentMap;
-  elements.mapPill.textContent = state.currentMap;
-  renderQuestList();
-  renderSelectedQuest();
-  updateMapMessage();
-  drawMap();
-}
+async function init() {
+  try {
+    setStatus("Chargement des maps...");
+    const [mapsData, tasksData] = await Promise.all([
+      fetchGraphQL(MAPS_QUERY, { lang: LANG }),
+      fetchGraphQL(TASKS_QUERY, { lang: LANG }),
+    ]);
 
-function handleMapClick(event) {
-  const quest = getQuestById(state.selectedQuestId);
-  if (!quest || quest.map !== state.currentMap) {
-    return;
+    state.maps = mapsData.maps;
+    state.tasks = tasksData.tasks;
+
+    renderMapOptions();
+    renderTaskOptions();
+    renderSelectedTasks();
+    setMapSelection(state.maps[0]?.id);
+
+    setStatus(`Pret. ${state.tasks.length} quetes chargees.`);
+  } catch (error) {
+    setStatus(`Erreur: ${error.message}`);
   }
-  const rect = elements.canvas.getBoundingClientRect();
-  const scaleX = elements.canvas.width / rect.width;
-  const scaleY = elements.canvas.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
-  quest.points.push({ x, y });
-  saveState();
-  render();
 }
 
-elements.questForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const name = elements.questName.value.trim();
-  const map = elements.questMap.value;
-  if (!name) return;
-  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  state.quests.unshift({ id, name, map, points: [] });
-  state.selectedQuestId = id;
-  state.currentMap = map;
-  elements.questName.value = "";
-  saveState();
-  render();
+mapSelect.addEventListener("change", (event) => {
+  setMapSelection(event.target.value);
 });
 
-elements.currentMap.addEventListener("change", (event) => {
-  state.currentMap = event.target.value;
-  saveState();
-  render();
+taskSelect.addEventListener("change", (event) => {
+  const value = event.target.value;
+  if (!value) {
+    return;
+  }
+  state.selectedTaskIds.add(value);
+  taskSelect.value = "";
+  renderSelectedTasks();
+  updateMapView();
 });
 
-elements.canvas.addEventListener("click", handleMapClick);
-
-mapImage.addEventListener("load", drawMap);
-
-loadState();
-populateSelects();
-render();
+init();

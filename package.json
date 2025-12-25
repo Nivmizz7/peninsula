@@ -1,9 +1,8 @@
 {
   "name": "peninsula",
   "version": "1.0.0",
+  "description": "Raid planner Escape from Tarkov (Tarkov.dev API)",
   "private": true,
-  "description": "Escape from Tarkov admin panel for quests and map points",
-  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   }
