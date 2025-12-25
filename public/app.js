@@ -223,6 +223,7 @@ function renderTaskOptions() {
     : state.tasks;
 
   filteredTasks
+    .filter((task) => !state.selectedTaskIds.has(task.id))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((task) => {
@@ -249,6 +250,7 @@ function renderSelectedTasks() {
     button.addEventListener("click", () => {
       state.selectedTaskIds.delete(task.id);
       renderSelectedTasks();
+      renderTaskOptions();
       updateMapView();
     });
     selectedTasksEl.appendChild(button);
@@ -442,6 +444,7 @@ taskSelect.addEventListener("change", (event) => {
   state.selectedTaskIds.add(value);
   taskSelect.value = "";
   renderSelectedTasks();
+  renderTaskOptions();
   updateMapView();
 });
 
