@@ -96,9 +96,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const sanitizedPoints = points.filter(
-        (pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)
-      );
+      const sanitizedPoints = points
+        .filter((pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y))
+        .map((pt) => ({
+          x: pt.x,
+          y: pt.y,
+          floorId: typeof pt.floorId === "string" ? pt.floorId : null,
+        }));
 
       if (!sanitizedPoints.length) {
         sendJson(res, 400, { error: "Invalid payload" });

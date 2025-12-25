@@ -152,6 +152,7 @@ function renderFloorControls() {
       state.selectedFloorIndex = index;
       renderFloorControls();
       applySvgFloorVisibility();
+      updateMarkers();
     });
     floorControls.appendChild(button);
   });
@@ -230,12 +231,14 @@ function updateMarkers() {
   }
 
   mapEmpty.style.display = "none";
+  const currentFloorId = state.svgFloorIds[state.selectedFloorIndex];
 
   selected.forEach((quest) => {
     const points = Array.isArray(quest.points) ? quest.points : quest.point ? [quest.point] : [];
     points.forEach((point) => {
       const marker = document.createElement("div");
-      marker.className = "marker red";
+      const isFloorMatch = !currentFloorId || !point.floorId || point.floorId === currentFloorId;
+      marker.className = `marker ${isFloorMatch ? "red" : "black"}`;
       marker.style.left = `${point.x}%`;
       marker.style.top = `${point.y}%`;
 

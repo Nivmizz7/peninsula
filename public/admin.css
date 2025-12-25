@@ -48,6 +48,10 @@
   gap: 10px;
 }
 
+.floor-controls {
+  justify-content: flex-end;
+}
+
 .secondary-btn,
 .ghost-btn {
   flex: 1;
