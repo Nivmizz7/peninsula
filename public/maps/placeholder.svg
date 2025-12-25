@@ -7,6 +7,6 @@
   </defs>
   <rect width="1200" height="800" fill="url(#bg)" />
   <rect x="120" y="140" width="960" height="520" fill="none" stroke="#f65f3b" stroke-width="6" stroke-dasharray="14 12" />
-  <text x="600" y="360" fill="#f2f4f3" font-family="Space Grotesk, sans-serif" font-size="36" text-anchor="middle">Ajoute une image de map</text>
+  <text x="600" y="360" fill="#f2f4f3" font-family="Space Grotesk, sans-serif" font-size="36" text-anchor="middle">Add a map image</text>
   <text x="600" y="410" fill="#cdd3d1" font-family="Space Grotesk, sans-serif" font-size="20" text-anchor="middle">/public/maps/&lt;normalizedName&gt;.png</text>
 </svg>

@@ -11,7 +11,7 @@
       <aside class="rail">
         <div class="brand">
           <span class="brand-title">Peninsula</span>
-          <span class="brand-subtitle">Raid planner Tarkov</span>
+          <span class="brand-subtitle">Tarkov raid planner</span>
         </div>
 
         <div class="panel">
@@ -20,20 +20,20 @@
         </div>
 
         <div class="panel">
-          <label class="panel-label" for="taskSelect">Quetes</label>
+          <label class="panel-label" for="taskSelect">Quests</label>
           <select id="taskSelect" class="panel-select">
-            <option value="">Ajouter une quete...</option>
+            <option value="">Add a quest...</option>
           </select>
         </div>
 
         <div class="panel panel-grow">
-          <div class="panel-label">Quetes selectionnees</div>
+          <div class="panel-label">Selected quests</div>
           <div id="selectedTasks" class="selected-tasks"></div>
         </div>
 
         <div class="panel status">
-          <div class="panel-label">Statut</div>
-          <div id="statusText" class="status-text">Chargement...</div>
+          <div class="panel-label">Status</div>
+          <div id="statusText" class="status-text">Loading...</div>
         </div>
       </aside>
 
@@ -41,7 +41,7 @@
         <header class="map-header">
           <div>
             <h1 id="mapTitle" class="map-title">Map</h1>
-            <p id="mapSubtitle" class="map-subtitle">Choisissez une map</p>
+            <p id="mapSubtitle" class="map-subtitle">Choose a map</p>
           </div>
           <div id="floorControls" class="floor-controls"></div>
         </header>
@@ -50,12 +50,12 @@
           <img id="mapImage" class="map-image" alt="Map" />
           <div id="mapSvg" class="map-svg" aria-hidden="true"></div>
           <div id="markerLayer" class="marker-layer"></div>
-          <div id="mapEmpty" class="map-empty">Aucun objectif sur cette map.</div>
+          <div id="mapEmpty" class="map-empty">No objectives on this map.</div>
         </div>
 
         <div class="legend">
-          <span class="legend-item"><span class="legend-dot legend-dot-red"></span>Etage selectionne</span>
-          <span class="legend-item"><span class="legend-dot legend-dot-black"></span>Autre etage</span>
+          <span class="legend-item"><span class="legend-dot legend-dot-red"></span>Selected floor</span>
+          <span class="legend-item"><span class="legend-dot legend-dot-black"></span>Other floor</span>
         </div>
       </main>
     </div>

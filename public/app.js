@@ -1,5 +1,5 @@
 const API_URL = "https://api.tarkov.dev/graphql";
-const LANG = "fr";
+const LANG = "en";
 
 const TASKS_QUERY = `
   query Tasks($lang: LanguageCode!) {
@@ -231,7 +231,7 @@ function renderMapOptions() {
 
 function renderTaskOptions() {
   taskSelect.innerHTML = "";
-  taskSelect.appendChild(createOption("", "Ajouter une quete..."));
+  taskSelect.appendChild(createOption("", "Add a quest..."));
   const filteredTasks = state.selectedMapNormalized
     ? state.tasks.filter((task) => task.map?.normalizedName === state.selectedMapNormalized)
     : state.tasks;
@@ -251,7 +251,7 @@ function renderSelectedTasks() {
   const selected = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
 
   if (!selected.length) {
-    selectedTasksEl.innerHTML = "<div class=\"status-text\">Aucune quete selectionnee.</div>";
+    selectedTasksEl.innerHTML = "<div class=\"status-text\">No quests selected.</div>";
     return;
   }
 
@@ -260,7 +260,7 @@ function renderSelectedTasks() {
     button.type = "button";
     button.className = "task-chip";
     button.textContent = task.name;
-    button.title = "Cliquer pour retirer";
+    button.title = "Click to remove";
     button.addEventListener("click", () => {
       state.selectedTaskIds.delete(task.id);
       renderSelectedTasks();
@@ -289,11 +289,11 @@ function extractSvgFloorIds(svgElement) {
 
 function labelForFloorId(id, index) {
   const mapping = {
-    Basement: "Sous-sol",
-    Ground_Floor: "RDC",
-    First_Floor: "Etage 1",
-    Second_Floor: "Etage 2",
-    Third_Floor: "Etage 3",
+    Basement: "Basement",
+    Ground_Floor: "Ground",
+    First_Floor: "Floor 1",
+    Second_Floor: "Floor 2",
+    Third_Floor: "Floor 3",
   };
   return mapping[id] || `Etage ${index + 1}`;
 }
@@ -358,10 +358,10 @@ async function setMapSelection(mapId) {
   state.selectedMapNormalized = map.normalizedName;
   mapSelect.value = map.id;
   mapTitle.textContent = map.name;
-  mapSubtitle.textContent = "Chargement de la map...";
+  mapSubtitle.textContent = "Loading map...";
 
   const mapAssetPath = await loadMapAsset(map.normalizedName);
-  mapSubtitle.textContent = `Carte chargee: ${mapAssetPath}`;
+  mapSubtitle.textContent = `Map loaded: ${mapAssetPath}`;
 
   if (state.mapAssetType === "img") {
     mapImage.src = mapAssetPath;
@@ -426,7 +426,7 @@ function computeFloors(zones) {
         svgId: id,
       }));
     }
-    return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
+    return [{ label: "Single floor", min: -Infinity, max: Infinity }];
   }
 
   const zValues = zones.map((zone) => getZoneZ(zone));
@@ -442,7 +442,7 @@ function computeFloors(zones) {
         svgId: id,
       }));
     }
-    return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
+    return [{ label: "Single floor", min: -Infinity, max: Infinity }];
   }
 
   const floorCount = svgFloorCount || 3;
@@ -452,7 +452,7 @@ function computeFloors(zones) {
     const min = index === 0 ? minZ - 0.01 : minZ + step * index;
     const max = index === floorCount - 1 ? maxZ + 0.01 : minZ + step * (index + 1);
     const svgId = state.svgFloorIds[index];
-    const label = svgId ? labelForFloorId(svgId, index) : `Etage ${index + 1}`;
+    const label = svgId ? labelForFloorId(svgId, index) : `Floor ${index + 1}`;
     return { label, min, max, svgId };
   });
 }
@@ -531,7 +531,7 @@ function updateMapView() {
 
 async function init() {
   try {
-    setStatus("Chargement des maps...");
+    setStatus("Loading maps...");
     const [mapsData, tasksData] = await Promise.all([
       fetchGraphQL(MAPS_QUERY, { lang: LANG }),
       fetchGraphQL(TASKS_QUERY, { lang: LANG }),
@@ -545,9 +545,9 @@ async function init() {
     renderSelectedTasks();
     await setMapSelection(state.maps[0]?.id);
 
-    setStatus(`Pret. ${state.tasks.length} quetes chargees.`);
+    setStatus(`Ready. ${state.tasks.length} quests loaded.`);
   } catch (error) {
-    setStatus(`Erreur: ${error.message}`);
+    setStatus(`Error: ${error.message}`);
   }
 }
 

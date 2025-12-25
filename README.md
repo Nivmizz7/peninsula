@@ -1,22 +1,22 @@
 # Peninsula
 
-Raid planner Escape from Tarkov, base sur l'API Tarkov.dev.
+Escape from Tarkov raid planner powered by the Tarkov.dev API.
 
-## Demarrer
+## Start
 
 ```bash
 npm start
 ```
 
-Puis ouvrir `http://localhost:3000`.
+Then open `http://localhost:3000`.
 
 ## Maps
 
-Ajoute les images de map dans `public/maps/` avec le nom `normalizedName` fourni par l'API.
-Exemple: `public/maps/customs.png`.
+Add map images to `public/maps/` using the `normalizedName` from the API.
+Example: `public/maps/customs.png`.
 
 ## Notes
 
-- Les quetes et objectifs sont charges via l'API (aucune donnee locale).
-- Les positions sont projetees de maniere relative sur l'image (X/Y normalises).
-- Les etages sont detectes via la hauteur Z des objectifs.
+- Quests and objectives are loaded from the API (no local data).
+- Positions are projected relative to the image (normalized X/Y).
+- Floors are inferred from the Z height of objectives.
