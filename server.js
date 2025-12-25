@@ -89,9 +89,18 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === "/api/quests" && req.method === "POST") {
     try {
       const payload = await parseBody(req);
-      const { name, map, point, hoverText } = payload;
+      const { name, map, points, hoverText, description } = payload;
 
-      if (!name || !map || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      if (!name || !map || !Array.isArray(points) || points.length === 0) {
+        sendJson(res, 400, { error: "Invalid payload" });
+        return;
+      }
+
+      const sanitizedPoints = points.filter(
+        (pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)
+      );
+
+      if (!sanitizedPoints.length) {
         sendJson(res, 400, { error: "Invalid payload" });
         return;
       }
@@ -102,8 +111,9 @@ const server = http.createServer(async (req, res) => {
         id: `${map}-${Date.now()}`,
         name,
         map,
-        point,
+        points: sanitizedPoints,
         hoverText: hoverText || "",
+        description: description || "",
       };
       quests.push(newQuest);
       writeJson(filePath, quests);

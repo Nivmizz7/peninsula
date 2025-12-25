@@ -19,6 +19,7 @@ const mapSvg = document.getElementById("mapSvg");
 const markerLayer = document.getElementById("markerLayer");
 const mapEmpty = document.getElementById("mapEmpty");
 const floorControls = document.getElementById("floorControls");
+const questDescription = document.getElementById("questDescription");
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -67,8 +68,12 @@ function renderSelectedQuests() {
 
   if (!selected.length) {
     selectedTasksEl.innerHTML = "<div class=\"status-text\">No quests selected.</div>";
+    questDescription.textContent = "Select a quest to see details.";
     return;
   }
+
+  const description = selected.map((quest) => quest.description || "").filter(Boolean).join("\n\n");
+  questDescription.textContent = description || "No description provided.";
 
   selected.forEach((quest) => {
     const button = document.createElement("button");
@@ -227,17 +232,20 @@ function updateMarkers() {
   mapEmpty.style.display = "none";
 
   selected.forEach((quest) => {
-    const marker = document.createElement("div");
-    marker.className = "marker red";
-    marker.style.left = `${quest.point.x}%`;
-    marker.style.top = `${quest.point.y}%`;
+    const points = Array.isArray(quest.points) ? quest.points : quest.point ? [quest.point] : [];
+    points.forEach((point) => {
+      const marker = document.createElement("div");
+      marker.className = "marker red";
+      marker.style.left = `${point.x}%`;
+      marker.style.top = `${point.y}%`;
 
-    const label = document.createElement("div");
-    label.className = "marker-label";
-    label.textContent = quest.hoverText || quest.name;
-    marker.appendChild(label);
+      const label = document.createElement("div");
+      label.className = "marker-label";
+      label.textContent = quest.hoverText || quest.name;
+      marker.appendChild(label);
 
-    markerLayer.appendChild(marker);
+      markerLayer.appendChild(marker);
+    });
   });
 }
 

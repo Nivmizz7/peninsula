@@ -42,6 +42,59 @@
   color: var(--muted);
 }
 
+.point-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.secondary-btn,
+.ghost-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+.secondary-btn {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.ghost-btn {
+  background: transparent;
+  color: var(--muted);
+}
+
+.point-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.point-item {
+  background: var(--panel-soft);
+  border-radius: 10px;
+  padding: 6px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.point-remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
 .primary-btn {
   width: 100%;
   padding: 10px 12px;

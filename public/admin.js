@@ -2,6 +2,7 @@ const state = {
   maps: [],
   selectedMap: null,
   selectedPoint: { x: 50, y: 50 },
+  points: [],
   mapAssetType: "img",
 };
 
@@ -13,9 +14,13 @@ const adminMapImage = document.getElementById("adminMapImage");
 const adminMapSvg = document.getElementById("adminMapSvg");
 const adminMarkerLayer = document.getElementById("adminMarkerLayer");
 const questNameInput = document.getElementById("questName");
+const questDescriptionInput = document.getElementById("questDescription");
 const hoverTextInput = document.getElementById("hoverText");
 const pointXInput = document.getElementById("pointX");
 const pointYInput = document.getElementById("pointY");
+const addPointButton = document.getElementById("addPoint");
+const clearPointsButton = document.getElementById("clearPoints");
+const pointList = document.getElementById("pointList");
 const saveQuestButton = document.getElementById("saveQuest");
 const adminStatus = document.getElementById("adminStatus");
 
@@ -101,11 +106,46 @@ function updatePointInputs() {
 
 function renderMarker() {
   adminMarkerLayer.innerHTML = "";
-  const marker = document.createElement("div");
-  marker.className = "marker red";
-  marker.style.left = `${state.selectedPoint.x}%`;
-  marker.style.top = `${state.selectedPoint.y}%`;
-  adminMarkerLayer.appendChild(marker);
+  state.points.forEach((point) => {
+    const marker = document.createElement("div");
+    marker.className = "marker red";
+    marker.style.left = `${point.x}%`;
+    marker.style.top = `${point.y}%`;
+    adminMarkerLayer.appendChild(marker);
+  });
+
+  const preview = document.createElement("div");
+  preview.className = "marker";
+  preview.style.left = `${state.selectedPoint.x}%`;
+  preview.style.top = `${state.selectedPoint.y}%`;
+  adminMarkerLayer.appendChild(preview);
+}
+
+function renderPointList() {
+  pointList.innerHTML = "";
+  if (!state.points.length) {
+    pointList.innerHTML = "<div class=\"status-text\">No points added.</div>";
+    return;
+  }
+
+  state.points.forEach((point, index) => {
+    const item = document.createElement("div");
+    item.className = "point-item";
+    item.textContent = `${point.x.toFixed(1)}%, ${point.y.toFixed(1)}%`;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "point-remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => {
+      state.points.splice(index, 1);
+      renderPointList();
+      renderMarker();
+    });
+
+    item.appendChild(remove);
+    pointList.appendChild(item);
+  });
 }
 
 function setPointFromClick(event) {
@@ -133,11 +173,28 @@ function setPointFromInputs() {
   renderMarker();
 }
 
+function addPoint() {
+  state.points.push({ ...state.selectedPoint });
+  renderPointList();
+  renderMarker();
+}
+
+function clearPoints() {
+  state.points = [];
+  renderPointList();
+  renderMarker();
+}
+
 async function saveQuest() {
   const name = questNameInput.value.trim();
   const hoverText = hoverTextInput.value.trim();
+  const description = questDescriptionInput.value.trim();
   if (!name || !state.selectedMap) {
     setStatus("Quest name and map are required.");
+    return;
+  }
+  if (!state.points.length) {
+    setStatus("Add at least one point.");
     return;
   }
 
@@ -149,12 +206,17 @@ async function saveQuest() {
       body: JSON.stringify({
         name,
         map: state.selectedMap.normalizedName,
-        point: state.selectedPoint,
+        points: state.points,
         hoverText,
+        description,
       }),
     });
     questNameInput.value = "";
+    questDescriptionInput.value = "";
     hoverTextInput.value = "";
+    state.points = [];
+    renderPointList();
+    renderMarker();
     setStatus("Quest saved.");
   } catch (error) {
     setStatus(`Error: ${error.message}`);
@@ -171,6 +233,7 @@ async function init() {
       setMapSelection(state.maps[0].normalizedName);
     }
     updatePointInputs();
+    renderPointList();
     renderMarker();
     setStatus("Ready.");
   } catch (error) {
@@ -188,6 +251,8 @@ adminMapFrame.addEventListener("click", (event) => {
 
 pointXInput.addEventListener("change", setPointFromInputs);
 pointYInput.addEventListener("change", setPointFromInputs);
+addPointButton.addEventListener("click", addPoint);
+clearPointsButton.addEventListener("click", clearPoints);
 saveQuestButton.addEventListener("click", saveQuest);
 
 init();

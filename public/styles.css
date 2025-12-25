@@ -28,7 +28,7 @@ body {
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 290px 1fr;
+  grid-template-columns: 290px 1fr 260px;
   gap: 0;
 }
 
@@ -128,6 +128,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.detail-panel {
+  padding: 26px 20px 28px 0;
+  display: flex;
+}
+
+.detail-text {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 .map-header {
@@ -305,5 +317,9 @@ body {
 
   .map-area {
     padding: 20px;
+  }
+
+  .detail-panel {
+    padding: 0 20px 24px 20px;
   }
 }

@@ -20,6 +20,7 @@ Example: `public/maps/customs.png`.
 ## Notes
 
 - Quests are stored in `data/quests/<map>.json` per map.
-- Points use percent coordinates relative to the map frame.
+- Each quest has a `points` array with percent coordinates relative to the map frame.
+- Quest descriptions show in the right-side panel.
 
 # MAPS ARE FROM SHEBUKA (https://github.com/the-hideout/tarkov-dev-svg-maps)
