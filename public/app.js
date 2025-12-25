@@ -218,7 +218,11 @@ function renderMapOptions() {
 function renderTaskOptions() {
   taskSelect.innerHTML = "";
   taskSelect.appendChild(createOption("", "Ajouter une quete..."));
-  state.tasks
+  const filteredTasks = state.selectedMapNormalized
+    ? state.tasks.filter((task) => task.map?.normalizedName === state.selectedMapNormalized)
+    : state.tasks;
+
+  filteredTasks
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((task) => {
@@ -268,6 +272,7 @@ function setMapSelection(mapId) {
     mapImage.src = "maps/placeholder.svg";
   };
 
+  renderTaskOptions();
   updateMapView();
 }
 
