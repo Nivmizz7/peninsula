@@ -18,9 +18,9 @@ const adminMarkerLayer = document.getElementById("adminMarkerLayer");
 const adminFloorControls = document.getElementById("adminFloorControls");
 const questNameInput = document.getElementById("questName");
 const questDescriptionInput = document.getElementById("questDescription");
-const hoverTextInput = document.getElementById("hoverText");
 const pointXInput = document.getElementById("pointX");
 const pointYInput = document.getElementById("pointY");
+const pointTextInput = document.getElementById("pointText");
 const addPointButton = document.getElementById("addPoint");
 const clearPointsButton = document.getElementById("clearPoints");
 const pointList = document.getElementById("pointList");
@@ -220,7 +220,8 @@ function renderPointList() {
     const item = document.createElement("div");
     item.className = "point-item";
     const floorLabel = point.floorId ? ` - ${point.floorId}` : "";
-    item.textContent = `${point.x.toFixed(1)}%, ${point.y.toFixed(1)}%${floorLabel}`;
+    const textLabel = point.text ? ` - ${point.text}` : "";
+    item.textContent = `${point.x.toFixed(1)}%, ${point.y.toFixed(1)}%${floorLabel}${textLabel}`;
 
     const remove = document.createElement("button");
     remove.type = "button";
@@ -264,7 +265,9 @@ function setPointFromInputs() {
 
 function addPoint() {
   const floorId = state.svgFloorIds[state.selectedFloorIndex] || null;
-  state.points.push({ ...state.selectedPoint, floorId });
+  const text = pointTextInput.value.trim();
+  state.points.push({ ...state.selectedPoint, floorId, text });
+  pointTextInput.value = "";
   renderPointList();
   renderMarker();
 }
@@ -277,7 +280,6 @@ function clearPoints() {
 
 async function saveQuest() {
   const name = questNameInput.value.trim();
-  const hoverText = hoverTextInput.value.trim();
   const description = questDescriptionInput.value.trim();
   if (!name || !state.selectedMap) {
     setStatus("Quest name and map are required.");
@@ -297,13 +299,11 @@ async function saveQuest() {
         name,
         map: state.selectedMap.normalizedName,
         points: state.points,
-        hoverText,
         description,
       }),
     });
     questNameInput.value = "";
     questDescriptionInput.value = "";
-    hoverTextInput.value = "";
     state.points = [];
     renderPointList();
     renderMarker();

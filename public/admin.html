@@ -31,11 +31,6 @@
         </div>
 
         <div class="panel">
-          <label class="panel-label" for="hoverText">Hover text</label>
-          <textarea id="hoverText" class="panel-input panel-textarea" rows="3" placeholder="Text shown on hover"></textarea>
-        </div>
-
-        <div class="panel">
           <div class="panel-label">Point on map</div>
           <div class="point-row">
             <label class="point-field">
@@ -47,6 +42,8 @@
               <input id="pointY" type="number" min="0" max="100" step="0.1" />
             </label>
           </div>
+          <label class="panel-label" for="pointText">Point text</label>
+          <input id="pointText" class="panel-input" type="text" placeholder="Text for this point" />
           <div class="point-actions">
             <button id="addPoint" class="secondary-btn" type="button">Add point</button>
             <button id="clearPoints" class="ghost-btn" type="button">Clear points</button>

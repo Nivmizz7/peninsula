@@ -244,7 +244,7 @@ function updateMarkers() {
 
       const label = document.createElement("div");
       label.className = "marker-label";
-      label.textContent = quest.hoverText || quest.name;
+      label.textContent = point.text || quest.name;
       marker.appendChild(label);
 
       markerLayer.appendChild(marker);
