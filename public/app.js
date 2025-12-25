@@ -197,6 +197,9 @@ const state = {
   svgFloorIds: [],
   mapAssetType: "img",
   mapBoundsByNormalized: {},
+  objectiveBoundsByNormalized: {},
+  svgMapRect: null,
+  svgViewBox: null,
 };
 
 const mapSelect = document.getElementById("mapSelect");
@@ -329,7 +332,47 @@ function labelForFloorId(id, index) {
     Second_Floor: "Floor 2",
     Third_Floor: "Floor 3",
   };
-  return mapping[id] || `Etage ${index + 1}`;
+  return mapping[id] || `Floor ${index + 1}`;
+}
+
+function computeSvgMapRect(svgElement) {
+  if (!svgElement) {
+    return null;
+  }
+
+  const viewBox = svgElement.viewBox?.baseVal;
+  const viewBoxRect = viewBox
+    ? { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height }
+    : { x: 0, y: 0, width: svgElement.clientWidth || 1, height: svgElement.clientHeight || 1 };
+
+  const borders = svgElement.querySelectorAll(".map_border");
+  if (!borders.length) {
+    return { mapRect: viewBoxRect, viewBox: viewBoxRect };
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  borders.forEach((border) => {
+    try {
+      const box = border.getBBox();
+      minX = Math.min(minX, box.x);
+      minY = Math.min(minY, box.y);
+      maxX = Math.max(maxX, box.x + box.width);
+      maxY = Math.max(maxY, box.y + box.height);
+    } catch (error) {
+      // Some SVG nodes may not support getBBox.
+    }
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return { mapRect: viewBoxRect, viewBox: viewBoxRect };
+  }
+
+  const mapRect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  return { mapRect, viewBox: viewBoxRect };
 }
 
 async function loadMapAsset(normalizedName) {
@@ -350,6 +393,9 @@ async function loadMapAsset(normalizedName) {
         mapImage.style.display = "none";
         state.mapAssetType = "svg";
         state.svgFloorIds = extractSvgFloorIds(svgElement);
+        const rectData = computeSvgMapRect(svgElement);
+        state.svgMapRect = rectData?.mapRect || null;
+        state.svgViewBox = rectData?.viewBox || null;
         return `maps/${candidate}.svg`;
       }
     } catch (error) {
@@ -361,6 +407,8 @@ async function loadMapAsset(normalizedName) {
   mapImage.style.display = "block";
   state.mapAssetType = "img";
   state.svgFloorIds = [];
+  state.svgMapRect = null;
+  state.svgViewBox = null;
   return mapImagePath(normalizedName);
 }
 
@@ -416,6 +464,53 @@ function computeBoundsFromPositions(positions) {
   return { minX, maxX, minY, maxY, xRange, yRange };
 }
 
+function mergeBounds(primary, secondary) {
+  if (!primary) {
+    return secondary;
+  }
+  if (!secondary) {
+    return primary;
+  }
+  const minX = Math.min(primary.minX, secondary.minX);
+  const maxX = Math.max(primary.maxX, secondary.maxX);
+  const minY = Math.min(primary.minY, secondary.minY);
+  const maxY = Math.max(primary.maxY, secondary.maxY);
+  const xRange = maxX - minX || 1;
+  const yRange = maxY - minY || 1;
+  return { minX, maxX, minY, maxY, xRange, yRange };
+}
+
+function buildObjectiveBoundsByMap(tasks) {
+  const positionsByMap = {};
+  tasks.forEach((task) => {
+    task.objectives.forEach((objective) => {
+      if (!objective.zones) {
+        return;
+      }
+      objective.zones.forEach((zone) => {
+        const mapName = zone.map?.normalizedName;
+        const pos = zone.position;
+        if (!mapName || !pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+          return;
+        }
+        if (!positionsByMap[mapName]) {
+          positionsByMap[mapName] = [];
+        }
+        positionsByMap[mapName].push({ x: pos.x, y: pos.y });
+      });
+    });
+  });
+
+  const boundsByMap = {};
+  Object.entries(positionsByMap).forEach(([mapName, positions]) => {
+    const bounds = computeBoundsFromPositions(positions);
+    if (bounds) {
+      boundsByMap[mapName] = bounds;
+    }
+  });
+  return boundsByMap;
+}
+
 async function loadMapBounds(map) {
   if (!map) {
     return;
@@ -435,8 +530,10 @@ async function loadMapBounds(map) {
 
     const positions = getPositionsFromMapDetail(mapDetail);
     const bounds = computeBoundsFromPositions(positions);
-    if (bounds) {
-      state.mapBoundsByNormalized[map.normalizedName] = bounds;
+    const objectiveBounds = state.objectiveBoundsByNormalized[map.normalizedName];
+    const merged = mergeBounds(bounds, objectiveBounds);
+    if (merged) {
+      state.mapBoundsByNormalized[map.normalizedName] = merged;
     }
   } catch (error) {
     // Bounds are optional; fall back to objective-relative positions.
@@ -592,17 +689,25 @@ function updateMarkers() {
     zones.map((zone) => ({ x: zone.position.x, y: zone.position.y }))
   );
   const resolvedBounds = bounds || fallbackBounds;
+  const viewBox = state.svgViewBox || { x: 0, y: 0, width: 1, height: 1 };
+  const mapRect = state.svgMapRect || viewBox;
 
   zones.forEach((zone) => {
-    const xPercent = ((zone.position.x - resolvedBounds.minX) / resolvedBounds.xRange) * 100;
-    const yPercent = ((zone.position.y - resolvedBounds.minY) / resolvedBounds.yRange) * 100;
+    const xLocal = (zone.position.x - resolvedBounds.minX) / resolvedBounds.xRange;
+    const yLocal = (zone.position.y - resolvedBounds.minY) / resolvedBounds.yRange;
+
+    const xSvg = mapRect.x + xLocal * mapRect.width;
+    const ySvg = mapRect.y + yLocal * mapRect.height;
+
+    const xPercent = ((xSvg - viewBox.x) / viewBox.width) * 100;
+    const yPercent = ((ySvg - viewBox.y) / viewBox.height) * 100;
     const floorIndex = zoneFloorIndex(zone, state.floors);
     const onSelectedFloor = floorIndex === state.selectedFloorIndex;
 
     const marker = document.createElement("div");
     marker.className = `marker ${onSelectedFloor ? "red" : "black"}`;
     marker.style.left = `${xPercent}%`;
-    marker.style.top = `${100 - yPercent}%`;
+    marker.style.top = `${yPercent}%`;
 
     const label = document.createElement("div");
     label.className = "marker-label";
@@ -632,6 +737,7 @@ async function init() {
 
     state.maps = mapsData.maps;
     state.tasks = tasksData.tasks;
+    state.objectiveBoundsByNormalized = buildObjectiveBoundsByMap(state.tasks);
 
     renderMapOptions();
     renderTaskOptions();
