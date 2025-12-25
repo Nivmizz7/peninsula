@@ -1,0 +1,22 @@
+[
+  {
+    "id": "groundzero-1766683951801",
+    "name": "Shooting Cans",
+    "map": "groundzero",
+    "points": [
+      {
+        "x": 52.468152866242036,
+        "y": 52.36938031591738,
+        "floorId": "Second_Floor",
+        "text": "Locate the Utyos machine gun"
+      },
+      {
+        "x": 45.54140127388535,
+        "y": 79.46943483275663,
+        "floorId": "Third_Floor",
+        "text": "Locate the AGS grenade launcher"
+      }
+    ],
+    "description": "Locate the Utyos machine gun\nLocate the AGS grenade launcher\nEliminate any 5 targets"
+  }
+]

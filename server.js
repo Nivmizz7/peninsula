@@ -97,22 +97,37 @@ const server = http.createServer(async (req, res) => {
           ? [point]
           : [];
 
-      if (!name || !map || rawPoints.length === 0) {
-        sendJson(res, 400, { error: "Invalid payload" });
+      if (!name || !map) {
+        sendJson(res, 400, { error: "Missing name or map" });
+        return;
+      }
+
+      if (rawPoints.length === 0) {
+        sendJson(res, 400, { error: "No points provided" });
         return;
       }
 
       const sanitizedPoints = rawPoints
-        .filter((pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y))
-        .map((pt) => ({
-          x: pt.x,
-          y: pt.y,
-          floorId: typeof pt.floorId === "string" ? pt.floorId : null,
-          text: typeof pt.text === "string" ? pt.text : "",
-        }));
+        .map((pt) => {
+          if (!pt) {
+            return null;
+          }
+          const x = Number(pt.x);
+          const y = Number(pt.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return null;
+          }
+          return {
+            x,
+            y,
+            floorId: typeof pt.floorId === "string" ? pt.floorId : null,
+            text: typeof pt.text === "string" ? pt.text : "",
+          };
+        })
+        .filter(Boolean);
 
       if (!sanitizedPoints.length) {
-        sendJson(res, 400, { error: "Invalid payload" });
+        sendJson(res, 400, { error: "No valid points" });
         return;
       }
 

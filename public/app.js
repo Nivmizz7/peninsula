@@ -1,11 +1,138 @@
+const API_URL = "https://api.tarkov.dev/graphql";
+const LANG = "en";
+
+const TASKS_QUERY = `
+  query Tasks($lang: LanguageCode!) {
+    tasks(lang: $lang) {
+      id
+      name
+      map {
+        id
+        name
+        normalizedName
+      }
+      objectives {
+        __typename
+        ... on TaskObjectiveBasic {
+          id
+          description
+          maps { name normalizedName }
+          zones {
+            id
+            map { name normalizedName }
+            position { x y z }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveMark {
+          id
+          description
+          maps { name normalizedName }
+          zones {
+            id
+            map { name normalizedName }
+            position { x y z }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveItem {
+          id
+          description
+          maps { name normalizedName }
+          zones {
+            id
+            map { name normalizedName }
+            position { x y z }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveQuestItem {
+          id
+          description
+          maps { name normalizedName }
+          zones {
+            id
+            map { name normalizedName }
+            position { x y z }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveUseItem {
+          id
+          description
+          maps { name normalizedName }
+          zones {
+            id
+            map { name normalizedName }
+            position { x y z }
+            top
+            bottom
+          }
+        }
+        ... on TaskObjectiveExtract {
+          id
+          description
+          maps { name normalizedName }
+          zoneNames
+        }
+      }
+    }
+  }
+`;
+
+const MAPS_QUERY = `
+  query Maps($lang: LanguageCode!) {
+    maps(lang: $lang) {
+      id
+      name
+      normalizedName
+    }
+  }
+`;
+
+const MAP_DETAIL_QUERY = `
+  query MapDetail($name: [String!]!, $lang: LanguageCode!) {
+    maps(name: $name, lang: $lang) {
+      name
+      normalizedName
+      spawns { position { x y z } }
+      extracts { position { x y z } }
+      transits { position { x y z } }
+      switches { position { x y z } }
+    }
+  }
+`;
+
+const MAP_ASSET_OVERRIDES = {
+  customs: "Customs.svg",
+  factory: "Factory.svg",
+  "ground-zero": "GroundZero.svg",
+  groundzero: "GroundZero.svg",
+  interchange: "Interchange.svg",
+  labs: "Labs.svg",
+  lighthouse: "Lighthouse.svg",
+  reserve: "Reserve.svg",
+  shoreline: "Shoreline.svg",
+  "streets-of-tarkov": "StreetsOfTarkov.svg",
+  streetsoftarkov: "StreetsOfTarkov.svg",
+  woods: "Woods.svg",
+};
+
 const state = {
   maps: [],
-  questsByMap: {},
-  selectedMap: null,
-  selectedQuestIds: new Set(),
-  mapAssetType: "img",
-  svgFloorIds: [],
+  tasks: [],
+  selectedMapId: null,
+  selectedMapNormalized: null,
+  selectedTaskIds: new Set(),
+  floors: [],
   selectedFloorIndex: 0,
+  svgFloorIds: [],
+  mapAssetType: "img",
+  mapBoundsByNormalized: {},
 };
 
 const mapSelect = document.getElementById("mapSelect");
@@ -25,12 +152,23 @@ function setStatus(message) {
   statusText.textContent = message;
 }
 
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
+async function fetchGraphQL(query, variables) {
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw new Error(`API error: ${response.status}`);
   }
-  return response.json();
+
+  const payload = await response.json();
+  if (payload.errors) {
+    throw new Error(payload.errors.map((err) => err.message).join(" | "));
+  }
+
+  return payload.data;
 }
 
 function createOption(value, label) {
@@ -43,28 +181,29 @@ function createOption(value, label) {
 function renderMapOptions() {
   mapSelect.innerHTML = "";
   state.maps.forEach((map) => {
-    mapSelect.appendChild(createOption(map.normalizedName, map.name));
+    mapSelect.appendChild(createOption(map.id, map.name));
   });
 }
 
-function renderQuestOptions() {
+function renderTaskOptions() {
   taskSelect.innerHTML = "";
   taskSelect.appendChild(createOption("", "Add a quest..."));
-  const quests = state.questsByMap[state.selectedMap?.normalizedName] || [];
+  const filteredTasks = state.selectedMapNormalized
+    ? state.tasks.filter((task) => task.map?.normalizedName === state.selectedMapNormalized)
+    : state.tasks;
 
-  quests
-    .filter((quest) => !state.selectedQuestIds.has(quest.id))
+  filteredTasks
+    .filter((task) => !state.selectedTaskIds.has(task.id))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((quest) => {
-      taskSelect.appendChild(createOption(quest.id, quest.name));
+    .forEach((task) => {
+      taskSelect.appendChild(createOption(task.id, task.name));
     });
 }
 
-function renderSelectedQuests() {
+function renderSelectedTasks() {
   selectedTasksEl.innerHTML = "";
-  const quests = state.questsByMap[state.selectedMap?.normalizedName] || [];
-  const selected = quests.filter((quest) => state.selectedQuestIds.has(quest.id));
+  const selected = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
 
   if (!selected.length) {
     selectedTasksEl.innerHTML = "<div class=\"status-text\">No quests selected.</div>";
@@ -72,20 +211,29 @@ function renderSelectedQuests() {
     return;
   }
 
-  const description = selected.map((quest) => quest.description || "").filter(Boolean).join("\n\n");
+  const description = selected
+    .map((task) => {
+      const objectives = task.objectives
+        .map((objective) => objective.description)
+        .filter(Boolean)
+        .join("\n");
+      return `${task.name}\n${objectives}`.trim();
+    })
+    .filter(Boolean)
+    .join("\n\n");
   questDescription.textContent = description || "No description provided.";
 
-  selected.forEach((quest) => {
+  selected.forEach((task) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "task-chip";
-    button.textContent = quest.name;
+    button.textContent = task.name;
     button.title = "Click to remove";
     button.addEventListener("click", () => {
-      state.selectedQuestIds.delete(quest.id);
-      renderSelectedQuests();
-      renderQuestOptions();
-      updateMarkers();
+      state.selectedTaskIds.delete(task.id);
+      renderSelectedTasks();
+      renderTaskOptions();
+      updateMapView();
     });
     selectedTasksEl.appendChild(button);
   });
@@ -158,122 +306,329 @@ function renderFloorControls() {
   });
 }
 
+function mapAssetCandidates(normalizedName) {
+  const candidates = [];
+  const override = MAP_ASSET_OVERRIDES[normalizedName];
+  if (override) {
+    candidates.push(override);
+  }
+  const lower = normalizedName.toLowerCase();
+  if (MAP_ASSET_OVERRIDES[lower]) {
+    candidates.push(MAP_ASSET_OVERRIDES[lower]);
+  }
+  const title = normalizedName
+    .split(/[^a-z0-9]/gi)
+    .filter(Boolean)
+    .map((chunk) => chunk[0].toUpperCase() + chunk.slice(1))
+    .join("");
+  if (title) {
+    candidates.push(`${title}.svg`);
+    candidates.push(`${title}.png`);
+  }
+  candidates.push(`${normalizedName}.svg`);
+  candidates.push(`${normalizedName}.png`);
+  return Array.from(new Set(candidates));
+}
+
 async function loadMapAsset(map) {
   if (!map) {
     return;
   }
 
-  if (map.asset.endsWith(".svg")) {
-    const response = await fetch(map.asset);
-    if (response.ok) {
-      const svgText = await response.text();
-      mapSvg.innerHTML = svgText;
-      const svgElement = mapSvg.querySelector("svg");
-      if (svgElement) {
-        svgElement.setAttribute("width", "100%");
-        svgElement.setAttribute("height", "100%");
-        svgElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  const normalizedName = map.normalizedName || map.name;
+  const candidates = mapAssetCandidates(normalizedName || "");
+  for (const candidate of candidates) {
+    const path = `maps/${candidate}`;
+    if (candidate.endsWith(".svg")) {
+      try {
+        const response = await fetch(path);
+        if (response.ok) {
+          const svgText = await response.text();
+          mapSvg.innerHTML = svgText;
+          const svgElement = mapSvg.querySelector("svg");
+          if (svgElement) {
+            svgElement.setAttribute("width", "100%");
+            svgElement.setAttribute("height", "100%");
+            svgElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+          }
+          mapSvg.style.display = "block";
+          mapImage.style.display = "none";
+          state.mapAssetType = "svg";
+          state.svgFloorIds = extractSvgFloorIds(svgElement);
+          state.selectedFloorIndex = 0;
+          renderFloorControls();
+          applySvgFloorVisibility();
+          return path;
+        }
+      } catch (error) {
+        // Ignore and try next candidate.
       }
-      mapSvg.style.display = "block";
-      mapImage.style.display = "none";
-      state.mapAssetType = "svg";
-      state.svgFloorIds = extractSvgFloorIds(svgElement);
-      state.selectedFloorIndex = 0;
-      renderFloorControls();
-      applySvgFloorVisibility();
-      return;
     }
   }
 
   mapSvg.style.display = "none";
   mapImage.style.display = "block";
-  mapImage.src = map.asset;
-  mapImage.onerror = () => {
-    mapImage.src = "maps/placeholder.svg";
-  };
+  mapImage.src = "maps/placeholder.svg";
   state.mapAssetType = "img";
   state.svgFloorIds = [];
   state.selectedFloorIndex = 0;
   renderFloorControls();
+  return "maps/placeholder.svg";
 }
 
-async function setMapSelection(normalizedName) {
-  const map = state.maps.find((item) => item.normalizedName === normalizedName) || state.maps[0];
+function getObjectiveZonesForMap(mapNormalized) {
+  const selectedTasks = state.tasks.filter((task) => state.selectedTaskIds.has(task.id));
+  const zones = [];
+
+  selectedTasks.forEach((task) => {
+    task.objectives.forEach((objective) => {
+      if (!objective.zones) {
+        return;
+      }
+
+      objective.zones.forEach((zone) => {
+        const zoneMap = zone.map?.normalizedName;
+        if (zoneMap && zoneMap === mapNormalized && zone.position) {
+          zones.push({
+            taskName: task.name,
+            objective: objective.description,
+            position: zone.position,
+            plane: { x: zone.position.x, y: zone.position.z },
+            top: zone.top,
+            bottom: zone.bottom,
+          });
+        }
+      });
+    });
+  });
+
+  return zones;
+}
+
+function getZoneZ(zone) {
+  const directZ = zone.position?.y;
+  if (Number.isFinite(directZ)) {
+    return directZ;
+  }
+
+  if (Number.isFinite(zone.top) && Number.isFinite(zone.bottom)) {
+    return (zone.top + zone.bottom) / 2;
+  }
+
+  return 0;
+}
+
+function computeFloors(zones) {
+  const svgFloorCount = state.svgFloorIds.length;
+  if (!zones.length) {
+    if (svgFloorCount) {
+      return state.svgFloorIds.map((id, index) => ({
+        label: labelForFloorId(id, index),
+        min: -Infinity,
+        max: Infinity,
+        svgId: id,
+      }));
+    }
+    return [{ label: "Single floor", min: -Infinity, max: Infinity }];
+  }
+
+  const zValues = zones.map((zone) => getZoneZ(zone));
+  const minZ = Math.min(...zValues);
+  const maxZ = Math.max(...zValues);
+
+  if (Math.abs(maxZ - minZ) < 0.01) {
+    if (svgFloorCount) {
+      return state.svgFloorIds.map((id, index) => ({
+        label: labelForFloorId(id, index),
+        min: -Infinity,
+        max: Infinity,
+        svgId: id,
+      }));
+    }
+    return [{ label: "Single floor", min: -Infinity, max: Infinity }];
+  }
+
+  const floorCount = svgFloorCount || 3;
+  const step = (maxZ - minZ) / floorCount;
+
+  return Array.from({ length: floorCount }, (_, index) => {
+    const min = index === 0 ? minZ - 0.01 : minZ + step * index;
+    const max = index === floorCount - 1 ? maxZ + 0.01 : minZ + step * (index + 1);
+    const svgId = state.svgFloorIds[index];
+    const label = svgId ? labelForFloorId(svgId, index) : `Floor ${index + 1}`;
+    return { label, min, max, svgId };
+  });
+}
+
+function zoneFloorIndex(zone, floors) {
+  const z = getZoneZ(zone);
+  const index = floors.findIndex((floor) => z >= floor.min && z <= floor.max);
+  return index === -1 ? 0 : index;
+}
+
+function renderMapOptionsAndSelectFirst() {
+  renderMapOptions();
+  const firstMap = state.maps[0];
+  if (firstMap) {
+    setMapSelection(firstMap.id);
+  }
+}
+
+function computeBoundsFromPositions(positions) {
+  if (!positions.length) {
+    return null;
+  }
+  const xs = positions.map((pos) => pos.x);
+  const ys = positions.map((pos) => pos.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const xRange = maxX - minX || 1;
+  const yRange = maxY - minY || 1;
+  return { minX, maxX, minY, maxY, xRange, yRange };
+}
+
+function getPositionsFromMapDetail(mapDetail) {
+  const positions = [];
+  const buckets = [mapDetail.spawns, mapDetail.extracts, mapDetail.transits, mapDetail.switches];
+
+  buckets.forEach((collection) => {
+    if (!Array.isArray(collection)) {
+      return;
+    }
+    collection.forEach((item) => {
+      const pos = item?.position;
+      if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z)) {
+        positions.push({ x: pos.x, y: pos.z });
+      }
+    });
+  });
+
+  return positions;
+}
+
+async function loadMapBounds(map) {
   if (!map) {
     return;
   }
 
-  state.selectedMap = map;
-  mapSelect.value = map.normalizedName;
-  mapTitle.textContent = map.name;
-  mapSubtitle.textContent = `Map loaded: ${map.asset}`;
+  if (state.mapBoundsByNormalized[map.normalizedName]) {
+    return;
+  }
 
-  await loadMapAsset(map);
-  renderQuestOptions();
-  renderSelectedQuests();
-  updateMarkers();
+  try {
+    const data = await fetchGraphQL(MAP_DETAIL_QUERY, { name: [map.name], lang: LANG });
+    const mapDetail = data.maps?.[0];
+    if (!mapDetail) {
+      return;
+    }
+
+    const positions = getPositionsFromMapDetail(mapDetail);
+    const bounds = computeBoundsFromPositions(positions);
+    if (bounds) {
+      state.mapBoundsByNormalized[map.normalizedName] = bounds;
+    }
+  } catch (error) {
+    // Bounds optional.
+  }
 }
 
-async function loadQuestsForMap(normalizedName) {
-  const data = await fetchJson(`/api/quests?map=${encodeURIComponent(normalizedName)}`);
-  state.questsByMap[normalizedName] = data.quests || [];
+async function setMapSelection(mapId) {
+  const map = state.maps.find((item) => item.id === mapId) || state.maps[0];
+  if (!map) {
+    return;
+  }
+
+  state.selectedMapId = map.id;
+  state.selectedMapNormalized = map.normalizedName;
+  mapSelect.value = map.id;
+  mapTitle.textContent = map.name;
+  mapSubtitle.textContent = "Loading map...";
+
+  state.selectedTaskIds.forEach((taskId) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (task && task.map?.normalizedName !== map.normalizedName) {
+      state.selectedTaskIds.delete(taskId);
+    }
+  });
+
+  const mapAssetPath = await loadMapAsset(map);
+  mapSubtitle.textContent = `Map loaded: ${mapAssetPath}`;
+
+  await loadMapBounds(map);
+
+  renderTaskOptions();
+  renderSelectedTasks();
+  updateMapView();
 }
 
 function updateMarkers() {
   markerLayer.innerHTML = "";
-  const mapName = state.selectedMap?.normalizedName;
-  const quests = state.questsByMap[mapName] || [];
-  const selected = quests.filter((quest) => state.selectedQuestIds.has(quest.id));
 
-  if (!selected.length) {
+  const zones = getObjectiveZonesForMap(state.selectedMapNormalized);
+  if (!zones.length) {
     mapEmpty.style.display = "flex";
     return;
   }
 
   mapEmpty.style.display = "none";
-  const currentFloorId = state.svgFloorIds[state.selectedFloorIndex];
+  const bounds = state.mapBoundsByNormalized[state.selectedMapNormalized];
+  const fallbackBounds = computeBoundsFromPositions(zones.map((zone) => zone.plane));
+  const resolvedBounds = bounds || fallbackBounds;
 
-  selected.forEach((quest) => {
-    const points = Array.isArray(quest.points) ? quest.points : quest.point ? [quest.point] : [];
-    points.forEach((point) => {
-      const marker = document.createElement("div");
-      const isFloorMatch = !currentFloorId || !point.floorId || point.floorId === currentFloorId;
-      marker.className = `marker ${isFloorMatch ? "red" : "black"}`;
-      marker.style.left = `${point.x}%`;
-      marker.style.top = `${point.y}%`;
+  zones.forEach((zone) => {
+    const xLocal = (zone.plane.x - resolvedBounds.minX) / resolvedBounds.xRange;
+    const yLocal = (zone.plane.y - resolvedBounds.minY) / resolvedBounds.yRange;
+    const floorIndex = zoneFloorIndex(zone, state.floors);
+    const onSelectedFloor = floorIndex === state.selectedFloorIndex;
 
-      const label = document.createElement("div");
-      label.className = "marker-label";
-      label.textContent = point.text || quest.name;
-      marker.appendChild(label);
+    const marker = document.createElement("div");
+    marker.className = `marker ${onSelectedFloor ? "red" : "black"}`;
+    marker.style.left = `${xLocal * 100}%`;
+    marker.style.top = `${(1 - yLocal) * 100}%`;
 
-      markerLayer.appendChild(marker);
-    });
+    const label = document.createElement("div");
+    label.className = "marker-label";
+    label.textContent = zone.objective || zone.taskName;
+    marker.appendChild(label);
+
+    markerLayer.appendChild(marker);
   });
+}
+
+function updateMapView() {
+  const zones = getObjectiveZonesForMap(state.selectedMapNormalized);
+  state.floors = computeFloors(zones);
+  state.selectedFloorIndex = Math.min(state.selectedFloorIndex, state.floors.length - 1);
+  renderFloorControls();
+  applySvgFloorVisibility();
+  updateMarkers();
 }
 
 async function init() {
   try {
     setStatus("Loading maps...");
-    const data = await fetchJson("/api/maps");
-    state.maps = data.maps || [];
+    const [mapsData, tasksData] = await Promise.all([
+      fetchGraphQL(MAPS_QUERY, { lang: LANG }),
+      fetchGraphQL(TASKS_QUERY, { lang: LANG }),
+    ]);
 
-    renderMapOptions();
-    if (state.maps.length) {
-      await loadQuestsForMap(state.maps[0].normalizedName);
-      await setMapSelection(state.maps[0].normalizedName);
-    }
+    state.maps = mapsData.maps || [];
+    state.tasks = tasksData.tasks || [];
 
-    setStatus("Ready.");
+    renderMapOptionsAndSelectFirst();
+    renderTaskOptions();
+    renderSelectedTasks();
+
+    setStatus(`Ready. ${state.tasks.length} quests loaded.`);
   } catch (error) {
     setStatus(`Error: ${error.message}`);
   }
 }
 
 mapSelect.addEventListener("change", async (event) => {
-  const value = event.target.value;
-  await loadQuestsForMap(value);
-  await setMapSelection(value);
+  await setMapSelection(event.target.value);
 });
 
 taskSelect.addEventListener("change", (event) => {
@@ -281,11 +636,11 @@ taskSelect.addEventListener("change", (event) => {
   if (!value) {
     return;
   }
-  state.selectedQuestIds.add(value);
+  state.selectedTaskIds.add(value);
   taskSelect.value = "";
-  renderSelectedQuests();
-  renderQuestOptions();
-  updateMarkers();
+  renderSelectedTasks();
+  renderTaskOptions();
+  updateMapView();
 });
 
 init();
