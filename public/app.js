@@ -153,6 +153,39 @@ const MAPS_QUERY = `
   }
 `;
 
+const MAP_DETAIL_QUERY = `
+  query MapDetail($name: [String!]!, $lang: LanguageCode!) {
+    maps(name: $name, lang: $lang) {
+      name
+      normalizedName
+      spawns {
+        position {
+          x
+          y
+        }
+      }
+      extracts {
+        position {
+          x
+          y
+        }
+      }
+      transits {
+        position {
+          x
+          y
+        }
+      }
+      switches {
+        position {
+          x
+          y
+        }
+      }
+    }
+  }
+`;
+
 const state = {
   maps: [],
   tasks: [],
@@ -163,6 +196,7 @@ const state = {
   selectedFloorIndex: 0,
   svgFloorIds: [],
   mapAssetType: "img",
+  mapBoundsByNormalized: {},
 };
 
 const mapSelect = document.getElementById("mapSelect");
@@ -348,6 +382,67 @@ function applySvgFloorVisibility() {
   });
 }
 
+function getPositionsFromMapDetail(mapDetail) {
+  const positions = [];
+  const buckets = [mapDetail.spawns, mapDetail.extracts, mapDetail.transits, mapDetail.switches];
+
+  buckets.forEach((collection) => {
+    if (!Array.isArray(collection)) {
+      return;
+    }
+    collection.forEach((item) => {
+      const pos = item?.position;
+      if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+        positions.push({ x: pos.x, y: pos.y });
+      }
+    });
+  });
+
+  return positions;
+}
+
+function computeBoundsFromPositions(positions) {
+  if (!positions.length) {
+    return null;
+  }
+  const xs = positions.map((pos) => pos.x);
+  const ys = positions.map((pos) => pos.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const xRange = maxX - minX || 1;
+  const yRange = maxY - minY || 1;
+  return { minX, maxX, minY, maxY, xRange, yRange };
+}
+
+async function loadMapBounds(map) {
+  if (!map) {
+    return;
+  }
+
+  const cached = state.mapBoundsByNormalized[map.normalizedName];
+  if (cached) {
+    return;
+  }
+
+  try {
+    const data = await fetchGraphQL(MAP_DETAIL_QUERY, { name: [map.name], lang: LANG });
+    const mapDetail = data.maps?.[0];
+    if (!mapDetail) {
+      return;
+    }
+
+    const positions = getPositionsFromMapDetail(mapDetail);
+    const bounds = computeBoundsFromPositions(positions);
+    if (bounds) {
+      state.mapBoundsByNormalized[map.normalizedName] = bounds;
+    }
+  } catch (error) {
+    // Bounds are optional; fall back to objective-relative positions.
+  }
+}
+
 async function setMapSelection(mapId) {
   const map = state.maps.find((item) => item.id === mapId) || state.maps[0];
   if (!map) {
@@ -362,6 +457,8 @@ async function setMapSelection(mapId) {
 
   const mapAssetPath = await loadMapAsset(map.normalizedName);
   mapSubtitle.textContent = `Map loaded: ${mapAssetPath}`;
+
+  await loadMapBounds(map);
 
   if (state.mapAssetType === "img") {
     mapImage.src = mapAssetPath;
@@ -490,19 +587,15 @@ function updateMarkers() {
   }
 
   mapEmpty.style.display = "none";
-  const xValues = zones.map((zone) => zone.position.x);
-  const yValues = zones.map((zone) => zone.position.y);
-  const minX = Math.min(...xValues);
-  const maxX = Math.max(...xValues);
-  const minY = Math.min(...yValues);
-  const maxY = Math.max(...yValues);
-
-  const xRange = maxX - minX || 1;
-  const yRange = maxY - minY || 1;
+  const bounds = state.mapBoundsByNormalized[state.selectedMapNormalized];
+  const fallbackBounds = computeBoundsFromPositions(
+    zones.map((zone) => ({ x: zone.position.x, y: zone.position.y }))
+  );
+  const resolvedBounds = bounds || fallbackBounds;
 
   zones.forEach((zone) => {
-    const xPercent = ((zone.position.x - minX) / xRange) * 100;
-    const yPercent = ((zone.position.y - minY) / yRange) * 100;
+    const xPercent = ((zone.position.x - resolvedBounds.minX) / resolvedBounds.xRange) * 100;
+    const yPercent = ((zone.position.y - resolvedBounds.minY) / resolvedBounds.yRange) * 100;
     const floorIndex = zoneFloorIndex(zone, state.floors);
     const onSelectedFloor = floorIndex === state.selectedFloorIndex;
 
