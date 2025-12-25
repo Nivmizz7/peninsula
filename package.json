@@ -1,0 +1,10 @@
+{
+  "name": "eft-quest-panel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Escape from Tarkov admin panel for quests and map points",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

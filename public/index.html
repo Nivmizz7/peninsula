@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EFT Admin Panel</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">EFT</div>
+          <div class="brand-title">Quest Admin</div>
+        </div>
+
+        <section class="card">
+          <h2>Nouvelle quete</h2>
+          <form id="quest-form">
+            <label>
+              Nom
+              <input type="text" id="quest-name" placeholder="Ex: Signal Part 1" required />
+            </label>
+            <label>
+              Map
+              <select id="quest-map"></select>
+            </label>
+            <button type="submit">Ajouter la quete</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Quetes</h2>
+            <div class="pill" id="map-pill"></div>
+          </div>
+          <div id="quest-list" class="quest-list"></div>
+        </section>
+
+        <section class="card selected">
+          <h2>Selection</h2>
+          <div id="selected-quest" class="selected-quest"></div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1>Cartes 2D</h1>
+            <p>Ajoute des points sur les maps Tarkov pour organiser les quetes.</p>
+          </div>
+          <div class="topbar-right">
+            <label class="inline">
+              Map active
+              <select id="current-map"></select>
+            </label>
+          </div>
+        </header>
+
+        <section class="map-panel">
+          <div class="map-overlay">
+            <div id="map-message" class="map-message"></div>
+          </div>
+          <canvas id="map-canvas" width="1200" height="750"></canvas>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
