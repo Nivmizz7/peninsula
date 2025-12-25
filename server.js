@@ -89,14 +89,20 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === "/api/quests" && req.method === "POST") {
     try {
       const payload = await parseBody(req);
-      const { name, map, points, description } = payload;
+      const { name, map, points, point, description } = payload;
 
-      if (!name || !map || !Array.isArray(points) || points.length === 0) {
+      const rawPoints = Array.isArray(points)
+        ? points
+        : point && typeof point === "object"
+          ? [point]
+          : [];
+
+      if (!name || !map || rawPoints.length === 0) {
         sendJson(res, 400, { error: "Invalid payload" });
         return;
       }
 
-      const sanitizedPoints = points
+      const sanitizedPoints = rawPoints
         .filter((pt) => pt && Number.isFinite(pt.x) && Number.isFinite(pt.y))
         .map((pt) => ({
           x: pt.x,
