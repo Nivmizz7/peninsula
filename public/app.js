@@ -161,6 +161,8 @@ const state = {
   selectedTaskIds: new Set(),
   floors: [],
   selectedFloorIndex: 0,
+  svgFloorIds: [],
+  mapAssetType: "img",
 };
 
 const mapSelect = document.getElementById("mapSelect");
@@ -170,6 +172,7 @@ const statusText = document.getElementById("statusText");
 const mapTitle = document.getElementById("mapTitle");
 const mapSubtitle = document.getElementById("mapSubtitle");
 const mapImage = document.getElementById("mapImage");
+const mapSvg = document.getElementById("mapSvg");
 const markerLayer = document.getElementById("markerLayer");
 const mapEmpty = document.getElementById("mapEmpty");
 const floorControls = document.getElementById("floorControls");
@@ -199,6 +202,17 @@ async function fetchGraphQL(query, variables) {
 
 function mapImagePath(normalizedName) {
   return `maps/${normalizedName}.png`;
+}
+
+function mapSvgPath(name) {
+  return `maps/${name}.svg`;
+}
+
+function capitalize(value) {
+  if (!value) {
+    return value;
+  }
+  return value[0].toUpperCase() + value.slice(1);
 }
 
 function createOption(value, label) {
@@ -257,7 +271,84 @@ function renderSelectedTasks() {
   });
 }
 
-function setMapSelection(mapId) {
+function extractSvgFloorIds(svgElement) {
+  if (!svgElement) {
+    return [];
+  }
+
+  const knownOrder = ["Basement", "Ground_Floor", "First_Floor", "Second_Floor", "Third_Floor"];
+  const topGroups = Array.from(svgElement.children).filter(
+    (node) => node.tagName && node.tagName.toLowerCase() === "g" && node.id
+  );
+
+  const byId = new Map(topGroups.map((group) => [group.id, group]));
+  const ordered = knownOrder.filter((id) => byId.has(id));
+
+  return ordered.length ? ordered : topGroups.map((group) => group.id);
+}
+
+function labelForFloorId(id, index) {
+  const mapping = {
+    Basement: "Sous-sol",
+    Ground_Floor: "RDC",
+    First_Floor: "Etage 1",
+    Second_Floor: "Etage 2",
+    Third_Floor: "Etage 3",
+  };
+  return mapping[id] || `Etage ${index + 1}`;
+}
+
+async function loadMapAsset(normalizedName) {
+  const svgCandidates = [normalizedName, capitalize(normalizedName)].filter(Boolean);
+  for (const candidate of svgCandidates) {
+    try {
+      const response = await fetch(mapSvgPath(candidate));
+      if (response.ok) {
+        const svgText = await response.text();
+        mapSvg.innerHTML = svgText;
+        const svgElement = mapSvg.querySelector("svg");
+        if (svgElement) {
+          svgElement.setAttribute("width", "100%");
+          svgElement.setAttribute("height", "100%");
+          svgElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        }
+        mapSvg.style.display = "block";
+        mapImage.style.display = "none";
+        state.mapAssetType = "svg";
+        state.svgFloorIds = extractSvgFloorIds(svgElement);
+        return `maps/${candidate}.svg`;
+      }
+    } catch (error) {
+      // Ignore and fallback to raster assets.
+    }
+  }
+
+  mapSvg.style.display = "none";
+  mapImage.style.display = "block";
+  state.mapAssetType = "img";
+  state.svgFloorIds = [];
+  return mapImagePath(normalizedName);
+}
+
+function applySvgFloorVisibility() {
+  if (state.mapAssetType !== "svg") {
+    return;
+  }
+
+  const svgElement = mapSvg.querySelector("svg");
+  if (!svgElement || !state.svgFloorIds.length) {
+    return;
+  }
+
+  state.svgFloorIds.forEach((id, index) => {
+    const group = svgElement.querySelector(`#${CSS.escape(id)}`);
+    if (group) {
+      group.style.display = index === state.selectedFloorIndex ? "inline" : "none";
+    }
+  });
+}
+
+async function setMapSelection(mapId) {
   const map = state.maps.find((item) => item.id === mapId) || state.maps[0];
   if (!map) {
     return;
@@ -267,12 +358,17 @@ function setMapSelection(mapId) {
   state.selectedMapNormalized = map.normalizedName;
   mapSelect.value = map.id;
   mapTitle.textContent = map.name;
-  mapSubtitle.textContent = `Image attendue: maps/${map.normalizedName}.png`;
+  mapSubtitle.textContent = "Chargement de la map...";
 
-  mapImage.src = mapImagePath(map.normalizedName);
-  mapImage.onerror = () => {
-    mapImage.src = "maps/placeholder.svg";
-  };
+  const mapAssetPath = await loadMapAsset(map.normalizedName);
+  mapSubtitle.textContent = `Carte chargee: ${mapAssetPath}`;
+
+  if (state.mapAssetType === "img") {
+    mapImage.src = mapAssetPath;
+    mapImage.onerror = () => {
+      mapImage.src = "maps/placeholder.svg";
+    };
+  }
 
   renderTaskOptions();
   updateMapView();
@@ -320,7 +416,16 @@ function getZoneZ(zone) {
 }
 
 function computeFloors(zones) {
+  const svgFloorCount = state.svgFloorIds.length;
   if (!zones.length) {
+    if (svgFloorCount) {
+      return state.svgFloorIds.map((id, index) => ({
+        label: labelForFloorId(id, index),
+        min: -Infinity,
+        max: Infinity,
+        svgId: id,
+      }));
+    }
     return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
   }
 
@@ -329,15 +434,27 @@ function computeFloors(zones) {
   const maxZ = Math.max(...zValues);
 
   if (Math.abs(maxZ - minZ) < 0.01) {
+    if (svgFloorCount) {
+      return state.svgFloorIds.map((id, index) => ({
+        label: labelForFloorId(id, index),
+        min: -Infinity,
+        max: Infinity,
+        svgId: id,
+      }));
+    }
     return [{ label: "Etage unique", min: -Infinity, max: Infinity }];
   }
 
-  const step = (maxZ - minZ) / 3;
-  return [
-    { label: "Bas", min: minZ - 0.01, max: minZ + step },
-    { label: "Milieu", min: minZ + step, max: minZ + step * 2 },
-    { label: "Haut", min: minZ + step * 2, max: maxZ + 0.01 },
-  ];
+  const floorCount = svgFloorCount || 3;
+  const step = (maxZ - minZ) / floorCount;
+
+  return Array.from({ length: floorCount }, (_, index) => {
+    const min = index === 0 ? minZ - 0.01 : minZ + step * index;
+    const max = index === floorCount - 1 ? maxZ + 0.01 : minZ + step * (index + 1);
+    const svgId = state.svgFloorIds[index];
+    const label = svgId ? labelForFloorId(svgId, index) : `Etage ${index + 1}`;
+    return { label, min, max, svgId };
+  });
 }
 
 function zoneFloorIndex(zone, floors) {
@@ -356,6 +473,7 @@ function renderFloorControls() {
     button.addEventListener("click", () => {
       state.selectedFloorIndex = index;
       renderFloorControls();
+      applySvgFloorVisibility();
       updateMarkers();
     });
     floorControls.appendChild(button);
@@ -407,6 +525,7 @@ function updateMapView() {
   state.floors = computeFloors(zones);
   state.selectedFloorIndex = Math.min(state.selectedFloorIndex, state.floors.length - 1);
   renderFloorControls();
+  applySvgFloorVisibility();
   updateMarkers();
 }
 
@@ -424,7 +543,7 @@ async function init() {
     renderMapOptions();
     renderTaskOptions();
     renderSelectedTasks();
-    setMapSelection(state.maps[0]?.id);
+    await setMapSelection(state.maps[0]?.id);
 
     setStatus(`Pret. ${state.tasks.length} quetes chargees.`);
   } catch (error) {
@@ -432,8 +551,8 @@ async function init() {
   }
 }
 
-mapSelect.addEventListener("change", (event) => {
-  setMapSelection(event.target.value);
+mapSelect.addEventListener("change", async (event) => {
+  await setMapSelection(event.target.value);
 });
 
 taskSelect.addEventListener("change", (event) => {

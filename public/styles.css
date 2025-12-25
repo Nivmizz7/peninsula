@@ -189,6 +189,18 @@ body {
   filter: saturate(1.1) contrast(1.05);
 }
 
+.map-svg {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.map-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .marker-layer {
   position: absolute;
   inset: 0;
