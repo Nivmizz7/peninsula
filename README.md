@@ -1,6 +1,6 @@
 # Peninsula
 
-Escape from Tarkov raid planner powered by the Tarkov.dev API.
+Escape from Tarkov raid planner powered by local JSON data.
 
 ## Start
 
@@ -10,13 +10,16 @@ npm start
 
 Then open `http://localhost:3000`.
 
+Admin page: `http://localhost:3000/admin`.
+
 ## Maps
 
-Add map images to `public/maps/` using the `normalizedName` from the API.
+Add map images to `public/maps/` using the `normalizedName` in `data/maps.json`.
 Example: `public/maps/customs.png`.
 
 ## Notes
 
-- Quests and objectives are loaded from the API (no local data).
-- Positions are projected relative to the image (normalized X/Y).
-- Floors are inferred from the Z height of objectives.
+- Quests are stored in `data/quests/<map>.json` per map.
+- Points use percent coordinates relative to the map frame.
+
+# MAPS ARE FROM SHEBUKA (https://github.com/the-hideout/tarkov-dev-svg-maps)

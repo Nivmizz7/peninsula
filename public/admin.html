@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Peninsula Admin</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="app admin">
+      <aside class="rail">
+        <div class="brand">
+          <span class="brand-title">Peninsula</span>
+          <span class="brand-subtitle">Admin</span>
+        </div>
+
+        <div class="panel">
+          <label class="panel-label" for="adminMapSelect">Map</label>
+          <select id="adminMapSelect" class="panel-select"></select>
+        </div>
+
+        <div class="panel">
+          <label class="panel-label" for="questName">Quest name</label>
+          <input id="questName" class="panel-input" type="text" placeholder="Quest name" />
+        </div>
+
+        <div class="panel">
+          <label class="panel-label" for="hoverText">Hover text</label>
+          <textarea id="hoverText" class="panel-input panel-textarea" rows="3" placeholder="Text shown on hover"></textarea>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">Point on map</div>
+          <div class="point-row">
+            <label class="point-field">
+              X%
+              <input id="pointX" type="number" min="0" max="100" step="0.1" />
+            </label>
+            <label class="point-field">
+              Y%
+              <input id="pointY" type="number" min="0" max="100" step="0.1" />
+            </label>
+          </div>
+          <p class="panel-hint">Click on the map to set the point.</p>
+        </div>
+
+        <div class="panel">
+          <button id="saveQuest" class="primary-btn" type="button">Save quest</button>
+          <div id="adminStatus" class="status-text">Ready.</div>
+        </div>
+      </aside>
+
+      <main class="map-area">
+        <header class="map-header">
+          <div>
+            <h1 id="adminMapTitle" class="map-title">Map</h1>
+            <p id="adminMapSubtitle" class="map-subtitle">Pick a map to start</p>
+          </div>
+        </header>
+
+        <div id="adminMapFrame" class="map-frame admin-frame">
+          <img id="adminMapImage" class="map-image" alt="Map" />
+          <div id="adminMapSvg" class="map-svg" aria-hidden="true"></div>
+          <div id="adminMarkerLayer" class="marker-layer"></div>
+        </div>
+      </main>
+    </div>
+
+    <script src="admin.js"></script>
+  </body>
+</html>

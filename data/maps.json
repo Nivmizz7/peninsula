@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Customs",
+    "normalizedName": "customs",
+    "asset": "maps/Customs.svg"
+  },
+  {
+    "name": "Factory",
+    "normalizedName": "factory",
+    "asset": "maps/Factory.svg"
+  },
+  {
+    "name": "Ground Zero",
+    "normalizedName": "groundzero",
+    "asset": "maps/GroundZero.svg"
+  },
+  {
+    "name": "Interchange",
+    "normalizedName": "interchange",
+    "asset": "maps/Interchange.svg"
+  },
+  {
+    "name": "Labs",
+    "normalizedName": "labs",
+    "asset": "maps/Labs.svg"
+  },
+  {
+    "name": "Lighthouse",
+    "normalizedName": "lighthouse",
+    "asset": "maps/Lighthouse.svg"
+  },
+  {
+    "name": "Reserve",
+    "normalizedName": "reserve",
+    "asset": "maps/Reserve.svg"
+  },
+  {
+    "name": "Shoreline",
+    "normalizedName": "shoreline",
+    "asset": "maps/Shoreline.svg"
+  },
+  {
+    "name": "Streets of Tarkov",
+    "normalizedName": "streetsoftarkov",
+    "asset": "maps/StreetsOfTarkov.svg"
+  },
+  {
+    "name": "Woods",
+    "normalizedName": "woods",
+    "asset": "maps/Woods.svg"
+  }
+]

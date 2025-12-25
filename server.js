@@ -4,6 +4,8 @@ const path = require("path");
 
 const port = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "public");
+const dataDir = path.join(__dirname, "data");
+const questsDir = path.join(dataDir, "quests");
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -24,9 +26,95 @@ function safeJoin(base, target) {
   return targetPath;
 }
 
-const server = http.createServer((req, res) => {
-  const urlPath = decodeURIComponent(req.url.split("?")[0]);
-  const requested = urlPath === "/" ? "/index.html" : urlPath;
+function sendJson(res, status, payload) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(payload));
+}
+
+function readJson(filePath, fallback) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function writeJson(filePath, payload) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2));
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      if (!body) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(body));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const urlPath = decodeURIComponent(url.pathname);
+
+  if (urlPath === "/api/maps" && req.method === "GET") {
+    const maps = readJson(path.join(dataDir, "maps.json"), []);
+    sendJson(res, 200, { maps });
+    return;
+  }
+
+  if (urlPath === "/api/quests" && req.method === "GET") {
+    const map = url.searchParams.get("map");
+    if (!map) {
+      sendJson(res, 400, { error: "Missing map" });
+      return;
+    }
+    const quests = readJson(path.join(questsDir, `${map}.json`), []);
+    sendJson(res, 200, { quests });
+    return;
+  }
+
+  if (urlPath === "/api/quests" && req.method === "POST") {
+    try {
+      const payload = await parseBody(req);
+      const { name, map, point, hoverText } = payload;
+
+      if (!name || !map || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        sendJson(res, 400, { error: "Invalid payload" });
+        return;
+      }
+
+      const filePath = path.join(questsDir, `${map}.json`);
+      const quests = readJson(filePath, []);
+      const newQuest = {
+        id: `${map}-${Date.now()}`,
+        name,
+        map,
+        point,
+        hoverText: hoverText || "",
+      };
+      quests.push(newQuest);
+      writeJson(filePath, quests);
+      sendJson(res, 201, { quest: newQuest });
+    } catch (error) {
+      sendJson(res, 400, { error: "Invalid JSON" });
+    }
+    return;
+  }
+
+  const requested = urlPath === "/" ? "/index.html" : urlPath === "/admin" ? "/admin.html" : urlPath;
   const filePath = safeJoin(publicDir, requested);
 
   if (!filePath) {
