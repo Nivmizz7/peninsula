@@ -122,6 +122,10 @@ const MAP_ASSET_OVERRIDES = {
   woods: "Woods.svg",
 };
 
+const MAP_CALIBRATION = {
+  customs: { flipX: true, flipY: true, swap: false, offsetX: 0.01, offsetY: 0.04, scaleX: 1, scaleY: 1 },
+};
+
 const state = {
   maps: [],
   tasks: [],
@@ -304,6 +308,32 @@ function renderFloorControls() {
     });
     floorControls.appendChild(button);
   });
+}
+
+function applyCalibration(normalizedName, x, y) {
+  const calib = MAP_CALIBRATION[normalizedName] || {};
+  let nextX = x;
+  let nextY = y;
+
+  if (calib.swap) {
+    [nextX, nextY] = [nextY, nextX];
+  }
+  if (calib.flipX) {
+    nextX = 1 - nextX;
+  }
+  if (calib.flipY) {
+    nextY = 1 - nextY;
+  }
+
+  const scaleX = Number.isFinite(calib.scaleX) ? calib.scaleX : 1;
+  const scaleY = Number.isFinite(calib.scaleY) ? calib.scaleY : 1;
+  const offsetX = Number.isFinite(calib.offsetX) ? calib.offsetX : 0;
+  const offsetY = Number.isFinite(calib.offsetY) ? calib.offsetY : 0;
+
+  nextX = (nextX - 0.5) * scaleX + 0.5 + offsetX;
+  nextY = (nextY - 0.5) * scaleY + 0.5 + offsetY;
+
+  return { x: nextX, y: nextY };
 }
 
 function mapAssetCandidates(normalizedName) {
@@ -580,13 +610,14 @@ function updateMarkers() {
   zones.forEach((zone) => {
     const xLocal = (zone.plane.x - resolvedBounds.minX) / resolvedBounds.xRange;
     const yLocal = (zone.plane.y - resolvedBounds.minY) / resolvedBounds.yRange;
+    const calibrated = applyCalibration(state.selectedMapNormalized, xLocal, yLocal);
     const floorIndex = zoneFloorIndex(zone, state.floors);
     const onSelectedFloor = floorIndex === state.selectedFloorIndex;
 
     const marker = document.createElement("div");
     marker.className = `marker ${onSelectedFloor ? "red" : "black"}`;
-    marker.style.left = `${xLocal * 100}%`;
-    marker.style.top = `${(1 - yLocal) * 100}%`;
+    marker.style.left = `${calibrated.x * 100}%`;
+    marker.style.top = `${(1 - calibrated.y) * 100}%`;
 
     const label = document.createElement("div");
     label.className = "marker-label";
