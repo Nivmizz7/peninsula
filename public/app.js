@@ -123,7 +123,7 @@ const MAP_ASSET_OVERRIDES = {
 };
 
 const MAP_CALIBRATION = {
-  customs: { flipX: true, flipY: true, swap: false, offsetX: 0.01, offsetY: 0.04, scaleX: 1, scaleY: 1 },
+  customs: { flipX: true, flipY: true, swap: false, offsetX: -0.005, offsetY: 0.035, scaleX: 0.95, scaleY: 0.95 },
 };
 
 const state = {
